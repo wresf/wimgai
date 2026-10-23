@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="VectorCraft AI Studio: pembuat aset microstock dengan AI, auto-upscale, dan metadata SEO 49 keyword untuk Adobe Stock.">
+<meta name="color-scheme" content="dark">
+<title>VectorCraft AI Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E✨%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
+<div id="toasts" class="fixed top-5 right-5 z-50 flex flex-col gap-2"></div>
+
+<header class="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-40 backdrop-blur">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="bg-blue-600 p-2.5 rounded-xl"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+      <div><h1 class="font-bold">VectorCraft AI Studio</h1><p class="text-xs text-slate-400">Microstock Asset &amp; Metadata Studio</p></div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="keyChip" onclick="openWizard()" class="text-xs bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 hover:border-blue-500"></button>
+      <div class="text-xs bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5">Target harian: <b id="daily" class="text-blue-400">0</b> / 60</div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+<nav class="flex border-b border-slate-800 text-sm overflow-x-auto" id="tabs"></nav>
+
+<!-- STEP 1 -->
+<section id="s1" class="grid lg:grid-cols-3 gap-6">
+  <div class="space-y-6">
+    <div class="card space-y-3">
+      <h2 class="font-semibold text-sm"><i class="fa-solid fa-key text-blue-500 mr-1"></i> Provider &amp; API Key</h2>
+      <label class="text-xs text-slate-400">AI Teks (prompt, metadata, SVG)</label>
+      <select id="txtProv" class="inp" onchange="saveProv()"><option value="gemini">Google Gemini</option><option value="groq">Groq (Llama)</option></select>
+      <div id="txtStat" class="text-[11px]"></div>
+      <label class="text-xs text-slate-400">AI Gambar (hanya mode Photo)</label>
+      <select id="imgProv" class="inp" onchange="saveProv()"><option value="hf">Hugging Face FLUX.1-schnell</option><option value="poll">Pollinations</option></select>
+      <div id="imgStat" class="text-[11px]"></div>
+      <button class="btn w-full" onclick="openWizard()"><i class="fa-solid fa-key"></i> Atur / Dapatkan API Key</button>
+    </div>
+    <div class="card space-y-3">
+      <h2 class="font-semibold text-sm"><i class="fa-solid fa-gear text-blue-500 mr-1"></i> Parameter</h2>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="tVector" onclick="setType('vector')" class="inp sel text-center">Vector (SVG+JPG)</button>
+        <button id="tPhoto" onclick="setType('photo')" class="inp text-center">Stock Photo (JPG)</button>
+      </div>
+      <label class="text-xs text-slate-400">Jumlah aset per batch (1–8)</label>
+      <input id="batchN" type="number" min="1" max="8" value="4" class="inp">
+      <label class="text-xs text-slate-400">Resolusi akhir (auto-upscale)</label>
+      <select id="outSize" class="inp"><option value="2048" selected>2048×2048 (4,2 MP, minimum Adobe)</option><option value="3072">3072×3072 (9,4 MP)</option><option value="4096">4096×4096 (16,8 MP, lebih lambat)</option></select>
+      <label class="text-xs text-slate-400">Ketajaman setelah upscale: <b id="sharpVal">60</b>%</label>
+      <input id="sharp" type="range" min="0" max="100" value="60" class="w-full" oninput="$('sharpVal').textContent=this.value">
+      <label class="text-xs text-slate-400">Preset tema</label>
+      <select id="preset" class="inp" onchange="applyPreset(this.value)"><option value="">-- Pilih preset --</option></select>
+      <label class="text-xs text-slate-400">Atau gambar acuan (perlu Gemini)</label>
+      <input id="refFile" type="file" accept="image/*" class="inp" onchange="loadRef(event)">
+    </div>
+  </div>
+  <div class="lg:col-span-2 card space-y-4">
+    <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+      <h2 class="font-semibold"><i class="fa-solid fa-pen-nib text-blue-500 mr-1"></i> Prompt</h2>
+      <button id="autoBtn" class="btn" onclick="autoPrompts()"><i class="fa-solid fa-wand-magic-sparkles"></i> Buat 10 Variasi Prompt</button>
+    </div>
+    <textarea id="prompt" rows="4" class="inp" placeholder="Tulis prompt, pilih preset, atau unggah gambar acuan lalu klik Buat 10 Variasi Prompt"></textarea>
+    <div id="vars" class="hidden space-y-2">
+      <p class="text-[11px] text-slate-400">Klik variasi untuk memakainya. Saat batch dijalankan, variasi dipakai berurutan untuk tiap aset.</p>
+      <div id="pills" class="space-y-1.5 max-h-52 overflow-y-auto"></div>
+    </div>
+    <div class="text-right pt-3 border-t border-slate-800"><button class="btn" onclick="go(2)">Lanjut ke Generasi <i class="fa-solid fa-arrow-right"></i></button></div>
+  </div>
+</section>
+
+<!-- STEP 2 -->
+<section id="s2" class="hidden card space-y-4">
+  <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-800 pb-4">
+    <div><h2 class="font-semibold text-lg">Generasi Batch</h2><p class="text-xs text-slate-400">Otomatis di-upscale, dipertajam, diberi EXIF &amp; 300 DPI, lalu dicek syarat submit.</p></div>
+    <button id="genBtn" class="btn" onclick="runBatch()"><i class="fa-solid fa-play"></i> Mulai Generasi</button>
+  </div>
+  <div id="prog" class="hidden space-y-2">
+    <div class="flex justify-between text-xs text-slate-400"><span id="progTxt"></span><span id="progPct"></span></div>
+    <div class="h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden"><div id="progBar" class="bg-blue-600 h-full w-0 transition-all"></div></div>
+  </div>
+  <div id="gallery" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+  <div class="text-right pt-3 border-t border-slate-800"><button class="btn" onclick="go(3)">Review Metadata <i class="fa-solid fa-arrow-right"></i></button></div>
+</section>
+
+<!-- STEP 3 -->
+<section id="s3" class="hidden card space-y-4">
+  <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+    <div><h2 class="font-semibold text-lg">Review &amp; Edit Metadata</h2><p class="text-xs text-slate-400">Title, kategori, description, dan 49 keywords bisa diedit sebelum ekspor.</p></div>
+    <button class="btn" onclick="go(4)">Lanjut ke Ekspor <i class="fa-solid fa-arrow-right"></i></button>
+  </div>
+  <div id="review" class="grid md:grid-cols-2 gap-4"></div>
+</section>
+
+<!-- STEP 4 -->
+<section id="s4" class="hidden card max-w-xl mx-auto text-center space-y-5">
+  <div class="text-4xl text-blue-400"><i class="fa-solid fa-file-zipper"></i></div>
+  <h2 class="text-xl font-bold">Paket Siap Diunduh</h2>
+  <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-left text-xs text-slate-400 space-y-1">
+    <div>📁 <b>JPG/</b> gambar resolusi tinggi (≥4 MP) dengan EXIF &amp; 300 DPI</div>
+    <div id="svgLine">📁 <b>SVG/</b> file vektor (konversi ke EPS lewat Illustrator/Inkscape bila perlu)</div>
+    <div>📁 <b>Metadata/</b> Adobe_Stock_Metadata.csv</div>
+  </div>
+  <p class="text-[11px] text-amber-400 text-left"><i class="fa-solid fa-triangle-exclamation"></i> Adobe Stock mewajibkan label "Created using generative AI" saat submit untuk konten buatan AI. Pastikan Anda mencentangnya.</p>
+  <button class="btn w-full py-3 text-sm" onclick="downloadZip()"><i class="fa-solid fa-download"></i> Download ZIP</button>
+</section>
+</main>
+
+<div id="wizard" class="hidden fixed inset-0 z-40 bg-black/70 flex items-start justify-center overflow-y-auto p-4" onclick="if(event.target===this)closeWizard()">
+  <div id="wizBox" class="card w-full max-w-2xl my-8 space-y-4" style="background:#0f172a" role="dialog" aria-modal="true" aria-label="Pengaturan API key"></div>
+</div>
+<noscript><p style="padding:2rem;color:#fff">Aplikasi ini membutuhkan JavaScript.</p></noscript>
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/piexif.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
